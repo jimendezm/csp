@@ -84,6 +84,14 @@ def backtracking(
 
 
 def _neighbors(name: str, constraints: list[str]):
+    result=[]
+    for constraint in constraints:
+        left, right = constraint.split("!=")
+        if name == left:
+            result.append(right)
+        else:
+            result.append(left)
+    return result
     #     for each constraint in constraints
     #         left, right <- split the constraint by "!="
 
@@ -98,7 +106,12 @@ def _neighbors(name: str, constraints: list[str]):
 
 
 def _arc_satisfied(x: str, y: str, X: Course, Y: Course, constraints: list[str]):
-
+    for constraint in constraints:
+        left, right = constraint.split("!=")
+        if (X.name==left and Y.name==right) or (X.name==right and Y.name == left):
+            if (x==y):
+                return False
+    return True
     #     for each constraint in constraints
     #         left, right <- split the constraint by "!="
 
@@ -111,7 +124,15 @@ def _arc_satisfied(x: str, y: str, X: Course, Y: Course, constraints: list[str])
 
 
 def revise(X: Course, Y: Course, constraints: list[str]):
-
+    revised=False
+    X_copy=X.domain[:]
+    Y_copy=Y.domain[:]
+    for x in X_copy:
+        for y in Y_copy:
+            if(_arc_satisfied(x,y,X,Y,constraints)):
+                X_copy.remove(x)
+                revised=True
+    return revised
     #     revised <- false
 
     #     for each x in a copy of X domain
@@ -124,6 +145,7 @@ def revise(X: Course, Y: Course, constraints: list[str]):
 
 
 def ac3(courses: list[Course], constraints: list[str]):
+    
     #     course map <- dictionary of courses using the name as key
     #     queue <- empty deque
 

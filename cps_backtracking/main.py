@@ -4,8 +4,13 @@ from cps_backtracking.csp import backtracking, initialize
 # variables <- list of courses
 # domain <- list of possible days
 # constraints <- list of incompatibilities
+variables=[]
+domain=[]
+constraints= ["A!=B", "C!=A"]
 
 
+def main():
+    
 # function main
 #     courses <- initialize(variables, domain)
 #     first course <- first element of courses
