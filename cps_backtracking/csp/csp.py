@@ -89,7 +89,7 @@ def _neighbors(name: str, constraints: list[str]):
         left, right = constraint.split("!=")
         if name == left:
             result.append(right)
-        else:
+        if name == right:
             result.append(left)
     return result
     #     for each constraint in constraints
@@ -128,10 +128,9 @@ def revise(X: Course, Y: Course, constraints: list[str]):
     X_copy=X.domain[:]
     Y_copy=Y.domain[:]
     for x in X_copy:
-        for y in Y_copy:
-            if(_arc_satisfied(x,y,X,Y,constraints)):
-                X_copy.remove(x)
-                revised=True
+        if not any(_arc_satisfied(x, y, X, Y, constraints) for y in Y.domain):
+            X.domain.remove(x)
+            revised=True
     return revised
     #     revised <- false
 
@@ -145,7 +144,26 @@ def revise(X: Course, Y: Course, constraints: list[str]):
 
 
 def ac3(courses: list[Course], constraints: list[str]):
-    
+    course_map = {course.name: course for course in courses}
+    queue = deque()
+ 
+    for constraint in constraints:
+        left, right = constraint.split("!=")
+        queue.append((left, right))
+        queue.append((right, left))
+ 
+    while queue:
+        x_name, y_name = queue.popleft()
+        X = course_map[x_name]
+        Y = course_map[y_name]
+ 
+        if revise(X, Y, constraints):
+            if not X.domain:
+                return False
+            for z_name in _neighbors(x_name, constraints):
+                if z_name != y_name:
+                    queue.append((z_name, x_name))
+    return True
     #     course map <- dictionary of courses using the name as key
     #     queue <- empty deque
 
@@ -172,11 +190,26 @@ def ac3(courses: list[Course], constraints: list[str]):
 
 
 def select_mrv(unassigned: list[Course], constraints: list[str]):
+    min_domain=len(unassigned[0].domain)
+    smallest_course=unassigned[0]
+    for course in unassigned:
+        if len(course.domain) < min_domain:
+            min_domain=len(course.domain)
+            smallest_course=course
+    return smallest_course
     #     return the course in unassigned with the smallest domain
     raise Exception("Not implemented")
 
 
 def _degree(course: Course, unassigned_names, constraints: list[str]):
+    count = 0
+    for constraint in constraints:
+        left, right = constraint.split("!=")
+        if course.name == left and right in unassigned_names:
+            count += 1
+        elif course.name == right and left in unassigned_names:
+            count += 1
+    return count
     #     count <- 0
 
     #     for each constraint in constraints
@@ -193,7 +226,19 @@ def _degree(course: Course, unassigned_names, constraints: list[str]):
 
 
 def select_degree(unassigned: list[Course], constraints: list[str]):
+    unassigned_names = {course.name for course in unassigned}
 
+    best_course = unassigned[0]
+    max_degree = _degree(best_course, unassigned_names, constraints)
+
+    for course in unassigned:
+        degree = _degree(course, unassigned_names, constraints)
+
+        if degree > max_degree:
+            max_degree = degree
+            best_course = course
+
+    return best_course
     #     unassigned names <- set of names of unassigned courses
 
     #     for each course compute degree as the number of constraints
@@ -204,6 +249,23 @@ def select_degree(unassigned: list[Course], constraints: list[str]):
 
 
 def select_mrv_degree(unassigned: list[Course], constraints: list[str]):
+    min_size=len(select_mrv(unassigned, constraints).domain)
+    candidates = [course for course in unassigned if len(course.domain) == min_size] 
+    if len(candidates) == 1:
+        return candidates[0]
+    
+    unassigned_names = {course.name for course in unassigned}
+    
+    best_course = candidates[0]
+    max_degree = _degree(best_course, unassigned_names, constraints)
+    for candidate in candidates:
+        degree = _degree(candidate, unassigned_names, constraints)
+
+        if degree > max_degree:
+            max_degree = degree
+            best_course = candidate
+
+    return best_course
     #     min size <- smallest domain size among unassigned courses
     #     candidates <- all unassigned courses whose domain size equals min size
 
@@ -220,6 +282,7 @@ def select_mrv_degree(unassigned: list[Course], constraints: list[str]):
 
 
 def _select_first(unassigned: list[Course], constraints: list[str]):
+    return unassigned[0]
     #     return the first course in unassigned
     raise Exception("Not implemented")
 
@@ -228,8 +291,39 @@ def backtracking_with_inference(
     unassigned: list[Course],
     assigned: list[Course],
     constraints: list[str],
-    select=_select_first,
+    select_var=_select_first,
 ):
+    if unassigned==[]:
+        return True
+    
+    course=select_var(unassigned,constraints)
+    remaining=[c for c in unassigned if c != course]
+    
+    for day in course.domain[:]:
+        course.assign(day)
+        
+        if not is_consistent(course, assigned, constraints):
+            course.remove_assignment()
+            continue
+        
+        assigned.append(course)
+        
+        all_courses = assigned + remaining
+        saved_domains = {c.name: c.domain[:] for c in all_courses}
+        course.domain = [day]
+        inference_ok = ac3(all_courses, constraints)
+        
+        if inference_ok:
+            if backtracking_with_inference(remaining, assigned, constraints, select_var):
+                return True
+            
+        for c in all_courses:
+            c.domain = saved_domains[c.name]
+            
+        assigned.pop()
+        course.remove_assignment()
+        
+    return False
     #     if unassigned is empty
     #         return true
 
